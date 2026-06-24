@@ -15,19 +15,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAP3Hav4jvq11ZOcdZrNK1_KCFpXfi4H6w",
-      authDomain: "vergara-cia.firebaseapp.com",
-      projectId: "vergara-cia",
-      storageBucket: "vergara-cia.firebasestorage.app",
-      messagingSenderId: "651583549190",
-      appId: "1:651583549190:web:84c1a35f9aaa06ceae7887"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db   = firebase.firestore();
-    const auth = firebase.auth();
-  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif; }
@@ -77,29 +64,18 @@ const CAT_TRABAJO   = ["Bencina","Pintura","Masilla","Materiales","Herramientas"
 const CAT_PERSONAL  = ["Comida","Transporte","Servicios","Arriendo","Salud","Otro"];
 const STORE_KEY     = "taller_v3_data";
 
-// ── FIREBASE SYNC ──────────────────────────────────────────────────────────
-async function fbSave(data) {
+// ── LOCAL STORAGE ─────────────────────────────────────────────────────────
+function localLoad() {
   try {
-    await db.collection("taller").doc("data").set(data);
-  } catch(e) { console.error("Error guardando:", e); }
+    const d = JSON.parse(localStorage.getItem("taller_v3_data")||"{}");
+    return { trabajos:[], gastos:[], tecnicos:[], presupuestos:[], ...d };
+  } catch { return { trabajos:[], gastos:[], tecnicos:[], presupuestos:[] }; }
 }
-async function fbLoad() {
+function localSave(data) {
   try {
-    const doc = await db.collection("taller").doc("data").get();
-    if (doc.exists) {
-      const d = doc.data();
-      return { trabajos:[], gastos:[], tecnicos:[], presupuestos:[], ...d };
-    }
-    return { trabajos:[], gastos:[], tecnicos:[], presupuestos:[] };
-  } catch(e) { return { trabajos:[], gastos:[], tecnicos:[], presupuestos:[] }; }
-}
-function fbListen(callback) {
-  return db.collection("taller").doc("data").onSnapshot(doc => {
-    if (doc.exists) {
-      const d = doc.data();
-      callback({ trabajos:[], gastos:[], tecnicos:[], presupuestos:[], ...d });
-    }
-  });
+    localStorage.setItem("taller_v3_data", JSON.stringify(data));
+    try { new BroadcastChannel("taller_v3_data").postMessage("u"); } catch {}
+  } catch {}
 }
 
 // ── ICONS ──────────────────────────────────────────────────────────────────
@@ -1045,74 +1021,6 @@ function VistaPresupuesto({ p, onClose, onEdit }) {
   </div>;
 }
 
-// ── LOGIN SCREEN ───────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }) {
-  const [email,setEmail]=useState("");
-  const [pass,setPass]=useState("");
-  const [error,setError]=useState("");
-  const [loading,setLoading]=useState(false);
-
-  async function handleLogin() {
-    if(!email||!pass){setError("Ingresa email y contraseña");return;}
-    setLoading(true); setError("");
-    try {
-      await auth.signInWithEmailAndPassword(email, pass);
-      onLogin();
-    } catch(e) {
-      setError("Email o contraseña incorrectos");
-      setLoading(false);
-    }
-  }
-
-  return <div style={{ minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif" }}>
-    <div style={{ width:"100%",maxWidth:380,padding:20 }}>
-      {/* Logo */}
-      <div style={{ textAlign:"center",marginBottom:40 }}>
-        <div style={{ width:64,height:64,background:"#CC0000",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px" }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" width="32" height="32">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-        </div>
-        <div style={{ fontSize:22,fontWeight:900,letterSpacing:3,color:"#fff" }}>VERGARA Y CIA</div>
-        <div style={{ fontSize:9,color:"#555",letterSpacing:4,marginTop:4 }}>SISTEMA DE GESTIÓN</div>
-      </div>
-
-      {/* Form */}
-      <div style={{ background:"#111",border:"1px solid #1E1E1E",borderTop:"3px solid #CC0000",padding:28 }}>
-        <div style={{ fontSize:10,color:"#CC0000",letterSpacing:3,fontWeight:700,marginBottom:20 }}>INICIAR SESIÓN</div>
-
-        <div style={{ marginBottom:14 }}>
-          <div style={{ fontSize:9,color:"#666",letterSpacing:2,marginBottom:6,fontWeight:700 }}>CORREO ELECTRÓNICO</div>
-          <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-            placeholder="tucorreo@gmail.com"
-            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-            style={{ background:"#000",border:"1px solid #333",padding:"11px 14px",color:"#fff",fontSize:13,width:"100%",fontFamily:"Arial,sans-serif",outline:"none" }}/>
-        </div>
-
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:9,color:"#666",letterSpacing:2,marginBottom:6,fontWeight:700 }}>CONTRASEÑA</div>
-          <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
-            placeholder="••••••••"
-            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-            style={{ background:"#000",border:"1px solid #333",padding:"11px 14px",color:"#fff",fontSize:13,width:"100%",fontFamily:"Arial,sans-serif",outline:"none" }}/>
-        </div>
-
-        {error&&<div style={{ background:"#3A0A0A",border:"1px solid #CC0000",padding:"8px 12px",color:"#FF6666",fontSize:12,marginBottom:14 }}>{error}</div>}
-
-        <button onClick={handleLogin} disabled={loading}
-          style={{ width:"100%",padding:"12px",background:loading?"#7A0000":"#CC0000",border:"none",color:"#fff",
-            fontFamily:"Arial,sans-serif",fontSize:12,fontWeight:700,letterSpacing:2,cursor:loading?"not-allowed":"pointer" }}>
-          {loading?"VERIFICANDO...":"ENTRAR"}
-        </button>
-      </div>
-
-      <div style={{ textAlign:"center",marginTop:16,fontSize:10,color:"#333" }}>
-        Acceso restringido — Solo usuarios autorizados
-      </div>
-    </div>
-  </div>;
-}
-
 // ── MAIN APP ───────────────────────────────────────────────────────────────
 function App() {
   const [tab,setTab]=useState("trabajos");
@@ -1125,9 +1033,8 @@ function App() {
   const [filtroMes,setFiltroMes]=useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
 
 function App() {
-  const [user,setUser]=useState(undefined);
   const [tab,setTab]=useState("trabajos");
-  const [data,setData]=useState({ trabajos:[], gastos:[], tecnicos:[], presupuestos:[] });
+  const [data,setData]=useState(()=>localLoad());
   const [modalTrabajo,setModalTrabajo]=useState(null);
   const [modalGasto,setModalGasto]=useState(null);
   const [modalTecnico,setModalTecnico]=useState(null);
@@ -1135,21 +1042,15 @@ function App() {
   const [verPresupuesto,setVerPresupuesto]=useState(null);
   const [filtroMes,setFiltroMes]=useState(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;});
 
-  // Auth listener
   useEffect(()=>{
-    const unsub = auth.onAuthStateChanged(u=>{ setUser(u||null); });
-    return unsub;
+    let bc;
+    try{ bc=new BroadcastChannel("taller_v3_data"); bc.onmessage=()=>setData(localLoad()); }catch{}
+    const onS=()=>setData(localLoad());
+    window.addEventListener("storage",onS);
+    return()=>{ if(bc)bc.close(); window.removeEventListener("storage",onS); };
   },[]);
 
-  // Firestore real-time listener (solo cuando hay sesión)
-  useEffect(()=>{
-    if(!user) return;
-    const unsub = fbListen(d=>setData(d));
-    return unsub;
-  },[user]);
-
-  async function updateData(d){ setData(d); await fbSave(d); }
-
+  function updateData(d){ setData(d); localSave(d); }
   function saveTrabajo(t){
     updateData(t.id?{...data,trabajos:data.trabajos.map(x=>x.id===t.id?t:x)}:{...data,trabajos:[{...t,id:Date.now().toString()},...data.trabajos]});
     setModalTrabajo(null);
@@ -1170,19 +1071,6 @@ function App() {
     setModalPresupuesto(null);
   }
   function deletePresupuesto(id){ if(!confirm("¿Eliminar presupuesto?"))return; updateData({...data,presupuestos:data.presupuestos.filter(x=>x.id!==id)}); }
-
-  // Pantalla cargando (verificando sesión)
-  if(user===undefined) return <div style={{ minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center" }}>
-    <div style={{ textAlign:"center" }}>
-      <div style={{ width:40,height:40,border:"3px solid #1E1E1E",borderTopColor:"#CC0000",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 16px" }}/>
-      <div style={{ color:"#444",fontSize:11,letterSpacing:3 }}>VERIFICANDO ACCESO...</div>
-    </div>
-  </div>;
-
-  // Pantalla de login
-  if(!user) return <LoginScreen onLogin={()=>{}}/>;
-
-  // Botón cerrar sesión (se agrega al header)
 
   const gastosMes=data.gastos.filter(g=>g.fecha?.startsWith(filtroMes));
   const gTrabajo=gastosMes.filter(g=>g.tipo==="trabajo");
@@ -1232,10 +1120,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <div style={{ fontSize:10,color:C.gray2,display:"flex",alignItems:"center",gap:12 }}>
-          <span style={{ color:C.green,fontSize:9 }}>● EN LÍNEA</span>
-          <button onClick={()=>auth.signOut()} style={{ padding:"5px 12px",border:`1px solid ${C.border}`,background:"transparent",color:C.gray2,cursor:"pointer",fontFamily:"Arial,sans-serif",fontSize:9,fontWeight:700,letterSpacing:1.5 }}>SALIR</button>
-        </div>
+        <div style={{ fontSize:10,color:C.gray2 }}>Vergara y CIA</div>
       </div>
       <div style={{ height:1,background:`linear-gradient(90deg,${C.red},transparent)` }}/>
     </header>
